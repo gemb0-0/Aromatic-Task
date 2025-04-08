@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,10 +33,19 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,7 +57,6 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-
     companion object {
         lateinit var bluetoothLauncher: ActivityResultLauncher<Intent>
         lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
@@ -57,12 +67,9 @@ class MainActivity : ComponentActivity() {
         addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
-
     }
     private val openSettingsIntent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
-
-    //rename it later
-    val bs = BluetoothController(this)
+    private val bluetoothController = BluetoothController(this)
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -73,7 +80,7 @@ class MainActivity : ComponentActivity() {
         permissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
                 if (permissions.values.all { it }) {
-                    bs.checkBluetoothStatus()
+                    bluetoothController.checkBluetoothStatus()
                 } else {
                     Toast.makeText(this, "permission denied", Toast.LENGTH_SHORT).show()
                 }
@@ -83,16 +90,16 @@ class MainActivity : ComponentActivity() {
                 if (result.resultCode != RESULT_OK) {
                     Toast.makeText(this, "enable Bluetooth", Toast.LENGTH_SHORT).show()
                 } else
-                    bs.startBluetoothDiscovery()
+                    bluetoothController.startBluetoothDiscovery()
             }
 
         registerReceiver(receiver, filter, RECEIVER_EXPORTED)
-        bs.checkBluetoothPermission()
+        bluetoothController.checkBluetoothPermission()
 
         setContent {
             AromaticTaskTheme {
                 val txt = remember { mutableStateOf("") }
-
+                var err by remember { mutableStateOf(false) }
                 Scaffold(modifier = Modifier.fillMaxSize()) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -104,20 +111,17 @@ class MainActivity : ComponentActivity() {
                                 "Available and saved devices ${availableDevices.size}"
                             else "Type something",
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .padding(top = 75.dp)
-                                .weight(2f)
-                        )
+                            modifier = Modifier.padding(top = 75.dp).weight(2f))
 
 
                         if (!BluetoothController.isBounded.value) {
-                            DeviceList(availableDevices, bs)
-                            Row(modifier = Modifier
-                                .weight(2f)
-                                .padding(top = 10.dp)) {
+                            DeviceList(availableDevices, bluetoothController)
+                            Row(modifier = Modifier.weight(2f).padding(top = 10.dp)) {
+
                                 Button(onClick = {
-                                    bs.startBluetoothDiscovery()
+                                    bluetoothController.startBluetoothDiscovery()
                                 }) { Text("start scanning") }
+
                                 Button(onClick = {
                                     startActivity(openSettingsIntent)
                                 }, modifier = Modifier.padding(horizontal = 7.dp))
@@ -125,7 +129,18 @@ class MainActivity : ComponentActivity() {
                             }
 
                         } else {
-                            OutlinedTextField(value = txt.value, onValueChange = { txt.value = it })
+                            OutlinedTextField(modifier = Modifier.focusable().onKeyEvent {
+                                if (it.isAltPressed) {
+                                    err = true
+                                } else {
+                                    err = false
+                                }
+                                false
+                            },
+                                isError = err,
+
+                                value = txt.value,
+                                onValueChange = { txt.value = it })
                             Spacer(modifier = Modifier.weight(2f))
                         }
                     }
@@ -141,8 +156,8 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         try {
             unregisterReceiver(receiver)
-        } catch (_: Exception) {
-
+        } catch (e: Exception) {
+            Log.i("Bluetooth","failed with exception $e")
         }
     }
 

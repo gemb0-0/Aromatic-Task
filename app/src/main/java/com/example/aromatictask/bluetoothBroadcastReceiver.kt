@@ -31,13 +31,9 @@ val receiver = object : BroadcastReceiver() {
             }
 
             BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
-                Log.i(
-                    "Bluetooth",
-                    "ACTION_BOND_STATE_CHANGED ${BluetoothDevice.ACTION_BOND_STATE_CHANGED}"
-                )
 
-                val bondState =
-                    intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
+                val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
+
                 if (bondState == BluetoothDevice.BOND_BONDED) {
                     isBounded.value = true
                     Log.i("Bluetooth", "Device paired successfully ")

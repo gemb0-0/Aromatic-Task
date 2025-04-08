@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -39,8 +40,7 @@ class BluetoothController(val context: Context) {
         )
 
         if (permissions.all {
-                ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-            }) {
+                ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }) {
             checkBluetoothStatus()
         } else {
             permissionLauncher.launch(permissions)
@@ -75,7 +75,7 @@ class BluetoothController(val context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun filterBoundedDevices(lst: List<BluetoothDevice>) {
-        lst.forEach { device ->
+                lst.forEach { device ->
             if (device.isAlreadyConnected() &&
                 device.bluetoothClass.majorDeviceClass == BluetoothClass.Device.Major.PERIPHERAL
             )
@@ -84,6 +84,7 @@ class BluetoothController(val context: Context) {
 
     }
 
+    //if the device is bounded and online
     private fun BluetoothDevice.isAlreadyConnected(): Boolean {
         return try {
             javaClass.getMethod("isConnected").invoke(this) as? Boolean? ?: false
